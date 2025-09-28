@@ -61,6 +61,15 @@ interface SupportedCamera extends Camera {
     height: number
   ): void
   clearViewOffset(): void
+  view: {
+    enabled: boolean
+    fullWidth: number
+    fullHeight: number
+    offsetX: number
+    offsetY: number
+    width: number
+    height: number
+  }
 }
 
 function isSupportedCamera(camera: Camera): camera is SupportedCamera {
@@ -260,6 +269,23 @@ export class TemporalAntialiasNode extends TempNode {
   private readonly historyNode = texture(this.historyRT.texture)
   private readonly previousDepthNode = texture(emptyDepthTexture)
   private readonly originalProjectionMatrix = new Matrix4()
+  private readonly originalViewOffset: {
+    enabled: boolean
+    fullWidth: number
+    fullHeight: number
+    offsetX: number
+    offsetY: number
+    width: number
+    height: number
+  } = {
+    enabled: false,
+    fullWidth: 0,
+    fullHeight: 0,
+    offsetX: 0,
+    offsetY: 0,
+    width: 0,
+    height: 0
+  }
   private jitterIndex = 0
 
   constructor(
@@ -326,7 +352,7 @@ export class TemporalAntialiasNode extends TempNode {
     this.needsClearHistory = false
   }
 
-  private setViewOffset(width: number, height: number): void {
+  private setViewOffset(fullWidth: number, fullHeight: number, offsetX: number, offsetY: number, width: number, height: number): void {
     // Store the unjittered projection matrix:
     const { camera } = this
     camera.updateProjectionMatrix()
@@ -334,15 +360,26 @@ export class TemporalAntialiasNode extends TempNode {
     highpVelocity.setProjectionMatrix(this.originalProjectionMatrix)
 
     const offset = haltonOffsets[this.jitterIndex]
-    const dx = offset.x - 0.5
-    const dy = offset.y - 0.5
-    camera.setViewOffset(width, height, dx, dy, width, height)
+    const dx = offsetX + offset.x - 0.5
+    const dy = offsetY + offset.y - 0.5
+    camera.setViewOffset(fullWidth, fullHeight, dx, dy, width, height)
   }
 
   private clearViewOffset(): void {
     // Reset the projection matrix modified in setViewOffset():
-    this.camera.clearViewOffset()
-    highpVelocity.setProjectionMatrix(null)
+    if (this.originalViewOffset.enabled) {
+      this.camera.setViewOffset(
+        this.originalViewOffset.fullWidth,
+        this.originalViewOffset.fullHeight,
+        this.originalViewOffset.offsetX,
+        this.originalViewOffset.offsetY,
+        this.originalViewOffset.width,
+        this.originalViewOffset.height
+      )
+    } else {
+      this.camera.clearViewOffset()
+      highpVelocity.setProjectionMatrix(null)
+    }
 
     // setViewOffset() can be called multiple times in a frame. Increment the
     // jitter index here.
@@ -510,11 +547,50 @@ export class TemporalAntialiasNode extends TempNode {
   }
 
   override setup(builder: NodeBuilder): unknown {
+    if (this.camera.view?.enabled) {
+        this.originalViewOffset.enabled = true;
+        this.originalViewOffset.fullHeight = this.camera.view.fullHeight;
+        this.originalViewOffset.fullWidth = this.camera.view.fullWidth;
+        this.originalViewOffset.offsetX = this.camera.view.offsetX;
+        this.originalViewOffset.offsetY = this.camera.view.offsetY;
+        this.originalViewOffset.width = this.camera.view.width;
+        this.originalViewOffset.height = this.camera.view.height;
+    }
+
     // We have to take care of the renaming of PostProcessing to RenderPipeline
     // in r183, as well as changes to property fields in the context.
     const onBeforeRenderPipeline = (): void => {
-      const size = builder.renderer.getDrawingBufferSize(sizeScratch)
-      this.setViewOffset(size.width, size.height)
+      let fullWidth;
+      let fullHeight;
+      let offsetX;
+      let offsetY;
+      let width;
+      let height;
+
+      // Copy original view offset
+      if (this.camera.view?.enabled) {
+        this.originalViewOffset.enabled = true;
+        this.originalViewOffset.fullHeight = this.camera.view.fullHeight;
+        this.originalViewOffset.fullWidth = this.camera.view.fullWidth;
+        this.originalViewOffset.offsetX = this.camera.view.offsetX;
+        this.originalViewOffset.offsetY = this.camera.view.offsetY;
+        this.originalViewOffset.width = this.camera.view.width;
+        this.originalViewOffset.height = this.camera.view.height;
+
+        fullWidth = this.camera.view.fullWidth;
+        fullHeight = this.camera.view.fullHeight;
+        offsetX = this.camera.view.offsetX;
+        offsetY = this.camera.view.offsetY;
+        width = this.camera.view.width;
+        height = this.camera.view.height;
+      } else {
+        const size = builder.renderer.getDrawingBufferSize(sizeScratch)
+        fullWidth = width = size.width;
+        fullHeight = height = size.height;
+        offsetX = offsetY = 0;
+      }
+
+      this.setViewOffset(fullWidth, fullHeight, offsetX, offsetY, width, height)
     }
     if (builder.context.renderPipeline != null) {
       const { context } = builder.context
