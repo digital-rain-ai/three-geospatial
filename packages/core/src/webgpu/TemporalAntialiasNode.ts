@@ -251,6 +251,7 @@ export class TemporalAntialiasNode extends TempNode {
   varianceGamma = uniform(1)
   velocityThreshold = uniform(0.1)
   depthError = uniform(0.001)
+  temporalBackgroundWeight = uniform(1)
 
   debugShowRejection = false
 
@@ -512,8 +513,12 @@ export class TemporalAntialiasNode extends TempNode {
         prevUV.lessThanEqual(1).all()
       ).toFloat()
 
-      // Don't apply TAA on the background:
-      const depthWeight = closestDepth.notEqual(1).toFloat()
+      // Optionally apply TAA on the background (depth == 1), useful for
+      // stabilizing sky/celestial features under camera jitter.
+      const depthWeight = max(
+        closestDepth.get('depth').notEqual(1).toFloat(),
+        this.temporalBackgroundWeight
+      )
 
       const outputColor = this.inputNode.load(coord).toVar()
       If(uvWeight.mul(depthWeight).mul(confidence).greaterThan(0), () => {
