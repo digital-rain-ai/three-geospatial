@@ -1,5 +1,11 @@
-import { HalfFloatType, Vector2 } from 'three'
-import { screenUV } from 'three/tsl'
+import {
+  HalfFloatType,
+  Vector2,
+  Matrix4,
+} from 'three'
+import {
+  screenUV,
+} from 'three/tsl'
 import {
   NodeUpdateType,
   RendererUtils,
@@ -42,6 +48,17 @@ export class StarsNode extends TempNode {
   private readonly renderTarget: RenderTarget
   private rendererState?: RendererUtils.RendererState
 
+  private readonly previousCameraMatrixWorld = new Matrix4()
+  private readonly previousProjectionMatrix = new Matrix4()
+  private readonly previousMatrixECIToECEF = new Matrix4()
+  private readonly previousMatrixECEFToWorld = new Matrix4()
+  private previousPointSize = NaN
+  private previousIntensity = NaN
+  private previousWidth = -1
+  private previousHeight = -1
+  private hasPreviousState = false
+  private needsRender = true
+
   constructor(data: string | ArrayBufferLike = DEFAULT_STARS_DATA_URL) {
     super('vec3')
     this.updateBeforeType = NodeUpdateType.FRAME
@@ -57,8 +74,57 @@ export class StarsNode extends TempNode {
   }
 
   setSize(width: number, height: number): this {
-    this.renderTarget.setSize(width, height)
+    if (this.renderTarget.width !== width || this.renderTarget.height !== height) {
+      this.renderTarget.setSize(width, height)
+      this.needsRender = true
+    }
     return this
+  }
+
+  private updateRenderState(
+    camera: NonNullable<NodeFrame['camera']>,
+    width: number,
+    height: number
+  ): boolean {
+    const { matrixECIToECEF, matrixECEFToWorld } = this.atmosphereContext
+
+    if (!this.hasPreviousState) {
+      this.previousCameraMatrixWorld.copy(camera.matrixWorld)
+      this.previousProjectionMatrix.copy(camera.projectionMatrix)
+      this.previousMatrixECIToECEF.copy(matrixECIToECEF.value)
+      this.previousMatrixECEFToWorld.copy(matrixECEFToWorld.value)
+      this.previousPointSize = this.pointSize.value
+      this.previousIntensity = this.intensity.value
+      this.previousWidth = width
+      this.previousHeight = height
+      this.hasPreviousState = true
+      return true
+    }
+
+    const changed =
+      this.needsRender ||
+      this.previousWidth !== width ||
+      this.previousHeight !== height ||
+      !this.previousCameraMatrixWorld.equals(camera.matrixWorld) ||
+      !this.previousProjectionMatrix.equals(camera.projectionMatrix) ||
+      !this.previousMatrixECIToECEF.equals(matrixECIToECEF.value) ||
+      !this.previousMatrixECEFToWorld.equals(matrixECEFToWorld.value) ||
+      this.previousPointSize !== this.pointSize.value ||
+      this.previousIntensity !== this.intensity.value
+
+    if (changed) {
+      this.previousCameraMatrixWorld.copy(camera.matrixWorld)
+      this.previousProjectionMatrix.copy(camera.projectionMatrix)
+      this.previousMatrixECIToECEF.copy(matrixECIToECEF.value)
+      this.previousMatrixECEFToWorld.copy(matrixECEFToWorld.value)
+      this.previousPointSize = this.pointSize.value
+      this.previousIntensity = this.intensity.value
+      this.previousWidth = width
+      this.previousHeight = height
+      this.needsRender = false
+    }
+
+    return changed
   }
 
   override updateBefore(frame: NodeFrame): void {
@@ -68,10 +134,12 @@ export class StarsNode extends TempNode {
       return
     }
 
-    // TODO: Skip rendering if not necessary.
-
     const size = renderer.getDrawingBufferSize(sizeScratch)
     this.setSize(size.x, size.y)
+
+    if (!this.updateRenderState(camera, size.x, size.y)) {
+      return
+    }
 
     this.rendererState = resetRendererState(renderer, this.rendererState)
 
