@@ -516,7 +516,7 @@ export class TemporalAntialiasNode extends TempNode {
       // Optionally apply TAA on the background (depth == 1), useful for
       // stabilizing sky/celestial features under camera jitter.
       const depthWeight = max(
-        closestDepth.get('depth').notEqual(1).toFloat(),
+        closestDepth.notEqual(1).toFloat(),
         this.temporalBackgroundWeight
       )
 

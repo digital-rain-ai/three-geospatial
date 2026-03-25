@@ -59,6 +59,9 @@ export class StarsNode extends TempNode {
   private hasPreviousState = false
   private needsRender = true
 
+  private matrixECIToECEF: Matrix4 = new Matrix4()
+  private matrixECEFToWorld: Matrix4 = new Matrix4()
+
   constructor(data: string | ArrayBufferLike = DEFAULT_STARS_DATA_URL) {
     super('vec3')
     this.updateBeforeType = NodeUpdateType.FRAME
@@ -86,13 +89,11 @@ export class StarsNode extends TempNode {
     width: number,
     height: number
   ): boolean {
-    const { matrixECIToECEF, matrixECEFToWorld } = this.atmosphereContext
-
     if (!this.hasPreviousState) {
       this.previousCameraMatrixWorld.copy(camera.matrixWorld)
       this.previousProjectionMatrix.copy(camera.projectionMatrix)
-      this.previousMatrixECIToECEF.copy(matrixECIToECEF.value)
-      this.previousMatrixECEFToWorld.copy(matrixECEFToWorld.value)
+      this.previousMatrixECIToECEF.copy(this.matrixECIToECEF)
+      this.previousMatrixECEFToWorld.copy(this.matrixECEFToWorld)
       this.previousPointSize = this.pointSize.value
       this.previousIntensity = this.intensity.value
       this.previousWidth = width
@@ -107,16 +108,16 @@ export class StarsNode extends TempNode {
       this.previousHeight !== height ||
       !this.previousCameraMatrixWorld.equals(camera.matrixWorld) ||
       !this.previousProjectionMatrix.equals(camera.projectionMatrix) ||
-      !this.previousMatrixECIToECEF.equals(matrixECIToECEF.value) ||
-      !this.previousMatrixECEFToWorld.equals(matrixECEFToWorld.value) ||
+      !this.previousMatrixECIToECEF.equals(this.matrixECIToECEF) ||
+      !this.previousMatrixECEFToWorld.equals(this.matrixECEFToWorld) ||
       this.previousPointSize !== this.pointSize.value ||
       this.previousIntensity !== this.intensity.value
 
     if (changed) {
       this.previousCameraMatrixWorld.copy(camera.matrixWorld)
       this.previousProjectionMatrix.copy(camera.projectionMatrix)
-      this.previousMatrixECIToECEF.copy(matrixECIToECEF.value)
-      this.previousMatrixECEFToWorld.copy(matrixECEFToWorld.value)
+      this.previousMatrixECIToECEF.copy(this.matrixECIToECEF)
+      this.previousMatrixECEFToWorld.copy(this.matrixECEFToWorld)
       this.previousPointSize = this.pointSize.value
       this.previousIntensity = this.intensity.value
       this.previousWidth = width
@@ -152,6 +153,12 @@ export class StarsNode extends TempNode {
   override setup(builder: NodeBuilder): unknown {
     const atmosphereContext = getAtmosphereContext(builder)
     this.stars.camera = atmosphereContext.camera
+
+    const { matrixECIToECEF, matrixECEFToWorld } =
+      atmosphereContext
+
+    this.matrixECIToECEF = matrixECIToECEF.value
+    this.matrixECEFToWorld = matrixECEFToWorld.value
 
     this.textureNode.uvNode = screenUV
     return this.textureNode
