@@ -1,17 +1,29 @@
 import {
+  DataTexture,
   DynamicDrawUsage,
+  FloatType,
   InstancedBufferAttribute,
   Matrix4,
+  RGBAFormat,
+  RedIntegerFormat,
+  UnsignedIntType,
   type Object3D
 } from 'three'
 import {
   attribute,
+  drawIndex,
+  float,
+  instanceIndex,
   instancedBufferAttribute,
+  int,
+  ivec2,
   mat4,
   nodeImmutable,
   positionPrevious,
   positionView,
   sub,
+  textureLoad,
+  textureSize,
   uniform,
   vec4
 } from 'three/tsl'
@@ -48,7 +60,29 @@ interface InstancedObject extends Object3D {
   instanceCount?: number
 }
 
-type InstancedMode = 'matrix' | 'position' | null
+interface BatchedObject extends Object3D {
+  isBatchedMesh?: boolean
+  _matricesTexture?: DataTexture
+  _indirectTexture?: DataTexture
+}
+
+type InstancedMode = 'matrix' | 'position' | 'batched' | null
+
+const MAX_SAFE_PREV_BATCH_MATRIX_BYTES = 256 * 1024 * 1024
+
+interface PrevBatchState {
+  matrices: DataTexture
+  indirect: DataTexture
+  matrixVersion: number
+  indirectVersion: number
+  seeded: boolean
+  disabled: boolean
+}
+
+interface PrevBatchStateEntry extends PrevBatchState {
+  objectRef: WeakRef<BatchedObject>
+  lastUsedFrame: number
+}
 
 export class HighpVelocityNode extends TempNode {
   static override get type(): string {
@@ -69,6 +103,14 @@ export class HighpVelocityNode extends TempNode {
   private readonly seededPrev = new WeakSet<InstancedObject>()
   private readonly prevPositions = new WeakMap<InstancedObject, InstancedBufferAttribute>()
   private readonly seededPrevPositions = new WeakSet<InstancedObject>()
+
+  // Previous-frame textures for BatchedMesh
+  private readonly prevBatchState = new Map<number, PrevBatchStateEntry>()
+  private frameIndex = 0
+  private frameSincePrevBatchPrune = 0
+
+  private static readonly PREV_BATCH_PRUNE_INTERVAL = 60
+  private static readonly PREV_BATCH_MAX_IDLE_FRAMES = 120
 
   constructor() {
     super('vec3')
@@ -92,6 +134,10 @@ export class HighpVelocityNode extends TempNode {
 
   // Executed once per frame:
   override update({ camera }: NodeFrame): void {
+    this.frameIndex += 1
+    this.frameSincePrevBatchPrune += 1
+    this.prunePrevBatchState()
+
     if (camera == null) {
       return
     }
@@ -126,6 +172,10 @@ export class HighpVelocityNode extends TempNode {
   }
 
   private static getInstancedMode(object: Object3D): InstancedMode {
+    if ((object as BatchedObject)?.isBatchedMesh === true) {
+      return 'batched'
+    }
+
     if ((object as any)?.isInstancedMesh === true) {
       return 'matrix'
     }
@@ -264,6 +314,104 @@ export class HighpVelocityNode extends TempNode {
     }
   }
 
+  private ensurePrevBatchTexturesAllocated(object: BatchedObject): void {
+    const srcMatrices = object._matricesTexture
+    const srcIndirect = object._indirectTexture
+    if (srcMatrices == null || srcIndirect == null) {
+      return
+    }
+
+    let state = this.getPrevBatchState(object)
+
+    const matrixWidth = srcMatrices.image.width
+    const matrixHeight = srcMatrices.image.height
+    const matrixByteSize = matrixWidth * matrixHeight * 4 * 4
+    if (matrixByteSize > MAX_SAFE_PREV_BATCH_MATRIX_BYTES) {
+      if (state != null && !state.disabled) {
+        state.matrices.dispose()
+        state.indirect.dispose()
+      }
+
+      if (state?.disabled !== true) {
+        this.setPrevBatchState(object, {
+          // Placeholders are never sampled while disabled.
+          matrices: srcMatrices,
+          indirect: srcIndirect,
+          matrixVersion: -1,
+          indirectVersion: -1,
+          seeded: false,
+          disabled: true
+        })
+      }
+
+      return
+    }
+
+    const indirectWidth = srcIndirect.image.width
+    const indirectHeight = srcIndirect.image.height
+
+    const needsRealloc =
+      state == null ||
+      state.disabled ||
+      state.matrices.image.width !== matrixWidth ||
+      state.matrices.image.height !== matrixHeight ||
+      state.indirect.image.width !== indirectWidth ||
+      state.indirect.image.height !== indirectHeight
+
+    if (needsRealloc) {
+      state?.matrices.dispose()
+      state?.indirect.dispose()
+
+      const matrices = new DataTexture(
+        new Float32Array(matrixWidth * matrixHeight * 4),
+        matrixWidth,
+        matrixHeight,
+        RGBAFormat,
+        FloatType
+      )
+
+      const indirect = new DataTexture(
+        new Uint32Array(indirectWidth * indirectHeight),
+        indirectWidth,
+        indirectHeight,
+        RedIntegerFormat,
+        UnsignedIntType
+      )
+
+      state = {
+        matrices,
+        indirect,
+        matrixVersion: -1,
+        indirectVersion: -1,
+        seeded: false,
+        disabled: false
+      }
+      this.setPrevBatchState(object, state)
+    }
+
+    if (state == null || state.disabled) {
+      return
+    }
+
+    this.touchPrevBatchState(object)
+
+    if (!state.seeded) {
+      const srcMatricesArray = srcMatrices.image.data as Float32Array
+      const dstMatricesArray = state.matrices.image.data as Float32Array
+      dstMatricesArray.set(srcMatricesArray)
+      state.matrices.needsUpdate = true
+      state.matrixVersion = srcMatrices.version
+
+      const srcIndirectArray = srcIndirect.image.data as Uint32Array
+      const dstIndirectArray = state.indirect.image.data as Uint32Array
+      dstIndirectArray.set(srcIndirectArray)
+      state.indirect.needsUpdate = true
+      state.indirectVersion = srcIndirect.version
+
+      state.seeded = true
+    }
+  }
+
   // Executed once per object before rendering:
   override updateBefore({ object, camera }: NodeFrame): void {
     if (object == null || camera == null) {
@@ -289,6 +437,9 @@ export class HighpVelocityNode extends TempNode {
     } else if (mode === 'position') {
       const instancedObject = object as InstancedObject
       this.ensurePrevPositionsAllocated(instancedObject)
+    } else if (mode === 'batched') {
+      const batchedObject = object as BatchedObject
+      this.ensurePrevBatchTexturesAllocated(batchedObject)
     }
   }
 
@@ -357,6 +508,39 @@ export class HighpVelocityNode extends TempNode {
 
         prev.needsUpdate = true
       }
+    } else if (mode === 'batched') {
+      const batchedObject = object as BatchedObject
+      this.ensurePrevBatchTexturesAllocated(batchedObject)
+
+      const srcMatrices = batchedObject._matricesTexture
+      const srcIndirect = batchedObject._indirectTexture
+      const state = this.getPrevBatchState(batchedObject)
+
+      if (
+        srcMatrices != null &&
+        state != null &&
+        !state.disabled &&
+        srcMatrices.version !== state.matrixVersion
+      ) {
+        const srcMatricesArray = srcMatrices.image.data as Float32Array
+        const dstMatricesArray = state.matrices.image.data as Float32Array
+        dstMatricesArray.set(srcMatricesArray)
+        state.matrices.needsUpdate = true
+        state.matrixVersion = srcMatrices.version
+      }
+
+      if (
+        srcIndirect != null &&
+        state != null &&
+        !state.disabled &&
+        srcIndirect.version !== state.indirectVersion
+      ) {
+        const srcIndirectArray = srcIndirect.image.data as Uint32Array
+        const dstIndirectArray = state.indirect.image.data as Uint32Array
+        dstIndirectArray.set(srcIndirectArray)
+        state.indirect.needsUpdate = true
+        state.indirectVersion = srcIndirect.version
+      }
     }
   }
 
@@ -370,6 +554,8 @@ export class HighpVelocityNode extends TempNode {
       this.ensurePrevColsAllocated(obj as InstancedObject)
     } else if (instancedMode === 'position') {
       this.ensurePrevPositionsAllocated(obj as InstancedObject)
+    } else if (instancedMode === 'batched') {
+      this.ensurePrevBatchTexturesAllocated(obj as BatchedObject)
     }
 
     // --- Current clip position ---
@@ -403,6 +589,44 @@ export class HighpVelocityNode extends TempNode {
       const currentNDC = currentClip.xyz.div(currentClip.w)
       const previousNDC = previousClip.xyz.div(previousClip.w)
       return sub(currentNDC, previousNDC)
+    } else if (instancedMode === 'batched') {
+      const batchedObject = obj as BatchedObject
+      const state = this.getPrevBatchState(batchedObject)
+      // If previous history is unavailable (or disabled due memory guard),
+      // use the current batched textures to keep reprojection path consistent.
+      // This yields near-zero object motion vectors instead of unstable jitter.
+      const prevMatricesTexture =
+        state?.disabled === false ? state.matrices : batchedObject._matricesTexture ?? null
+      const prevIndirectTexture =
+        state?.disabled === false ? state.indirect : batchedObject._indirectTexture ?? null
+
+      if (prevMatricesTexture != null && prevIndirectTexture != null) {
+        const batchingIdNode =
+          (builder as any).getDrawIndex?.() == null ? instanceIndex : drawIndex
+
+        const indirectSize = int(
+          textureSize(textureLoad(prevIndirectTexture), int(0)).x
+        )
+        const indirectX = int(batchingIdNode).mod(indirectSize)
+        const indirectY = int(batchingIdNode).div(indirectSize)
+        const indirectId = textureLoad(
+          prevIndirectTexture,
+          ivec2(indirectX, indirectY)
+        ).x
+
+        const size = int(textureSize(textureLoad(prevMatricesTexture), int(0)).x)
+        const j = float(indirectId).mul(4).toInt().toVar()
+        const x = j.mod(size)
+        const y = j.div(size)
+        const previousBatchMatrix = mat4(
+          textureLoad(prevMatricesTexture, ivec2(x, y)),
+          textureLoad(prevMatricesTexture, ivec2(x.add(1), y)),
+          textureLoad(prevMatricesTexture, ivec2(x.add(2), y)),
+          textureLoad(prevMatricesTexture, ivec2(x.add(3), y))
+        )
+
+        previousPath = previousPath.mul(previousBatchMatrix)
+      }
     }
 
     const previousClip = previousPath.mul(positionPrevious).toVertexStage()
@@ -413,6 +637,68 @@ export class HighpVelocityNode extends TempNode {
     const previousNDC = previousClip.xyz.div(previousClip.w)
 
     return sub(currentNDC, previousNDC)
+  }
+
+  override dispose(): void {
+    this.prunePrevBatchState(true)
+    super.dispose()
+  }
+
+  private getPrevBatchState(object: BatchedObject): PrevBatchState | undefined {
+    const state = this.prevBatchState.get(object.id)
+    if (state == null) {
+      return undefined
+    }
+
+    const current = state.objectRef.deref()
+    if (current === object) {
+      return state
+    }
+
+    if (current == null && !state.disabled) {
+      state.matrices.dispose()
+      state.indirect.dispose()
+    }
+    this.prevBatchState.delete(object.id)
+    return undefined
+  }
+
+  private setPrevBatchState(object: BatchedObject, state: PrevBatchState): void {
+    this.prevBatchState.set(object.id, {
+      ...state,
+      objectRef: new WeakRef(object),
+      lastUsedFrame: this.frameIndex
+    })
+  }
+
+  private touchPrevBatchState(object: BatchedObject): void {
+    const state = this.prevBatchState.get(object.id)
+    if (state != null) {
+      state.lastUsedFrame = this.frameIndex
+    }
+  }
+
+  private prunePrevBatchState(force = false): void {
+    if (!force && this.frameSincePrevBatchPrune < HighpVelocityNode.PREV_BATCH_PRUNE_INTERVAL) {
+      return
+    }
+
+    this.frameSincePrevBatchPrune = 0
+
+    const pruneBefore = this.frameIndex - HighpVelocityNode.PREV_BATCH_MAX_IDLE_FRAMES
+    for (const [objectId, state] of this.prevBatchState) {
+      const object = state.objectRef.deref()
+      const stale = object == null || state.lastUsedFrame < pruneBefore
+      if (!stale) {
+        continue
+      }
+
+      if (!state.disabled) {
+        state.matrices.dispose()
+        state.indirect.dispose()
+      }
+      this.prevBatchState.delete(objectId)
+    }
   }
 }
 
