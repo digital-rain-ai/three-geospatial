@@ -56,13 +56,14 @@ function transformType(type: FnLayoutType): string {
   if (typeof type === 'string') {
     return type
   }
-  if ('layout' in type && type.layout instanceof StructTypeNode) {
-    if (type.layout.name == null) {
+  //if (type instanceof StructTypeNode) {
+    if (type.name == null) {
       throw new Error('Struct name is required.')
     }
-    return type.layout.name
-  }
-  throw new Error(`Unsupported layout type: ${type}`)
+    return type.name
+  //}
+  // console.log('type', type);
+  // throw new Error(`Unsupported layout type: ${type}`)
 }
 
 export function FnLayout<
