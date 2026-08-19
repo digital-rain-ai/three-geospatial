@@ -23,7 +23,9 @@ import {
   textureSize,
   uniform,
   vec3,
-  vec4
+  vec4,
+  // @ts-expect-error: OnBeforeRenderPipeline is not exported from three.js, but it exists in the source code.
+  OnBeforeRenderPipeline
 } from 'three/tsl'
 import {
   NodeMaterial,
@@ -598,9 +600,10 @@ export class TemporalAntialiasNode extends TempNode {
       this.setViewOffset(fullWidth, fullHeight, offsetX, offsetY, width, height)
     }
     if (builder.context.renderPipeline != null) {
-      const { context } = builder.context
-        .renderPipeline as RenderPipelineContext
-      context.onBeforeRenderPipeline = onBeforeRenderPipeline
+      // const { context } = builder.context
+      //   .renderPipeline as RenderPipelineContext
+      //context.onBeforeRenderPipeline = onBeforeRenderPipeline
+      OnBeforeRenderPipeline(onBeforeRenderPipeline);
       this.needsSyncRenderPipeline = true
     }
     if (builder.context.postProcessing != null) {
