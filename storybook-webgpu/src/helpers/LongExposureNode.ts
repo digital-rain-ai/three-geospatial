@@ -22,7 +22,7 @@ import {
   RendererUtils,
   RenderTarget,
   StorageTexture,
-  TempNode,
+  Node,
   Vector2,
   type ComputeNode,
   type DataTextureImageData,
@@ -59,7 +59,7 @@ function createStorageTexture(name: string): StorageTexture {
 const sizeScratch = new Vector2()
 
 // TODO: Refine and move to core.
-export class LongExposureNode extends TempNode {
+export class LongExposureNode extends Node {
   static override get type(): string {
     return 'LongExposureNode'
   }

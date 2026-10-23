@@ -9,7 +9,7 @@ import {
   vec3,
   vec4
 } from 'three/tsl'
-import { TempNode, type NodeBuilder } from 'three/webgpu'
+import { Node as TNode, type NodeBuilder } from 'three/webgpu'
 
 import {
   equirectToDirectionWorld,
@@ -30,7 +30,7 @@ const BACKDROP = 'BACKDROP'
 
 type SkyNodeScope = typeof CAMERA | typeof EQUIRECTANGULAR | typeof BACKDROP
 
-export class SkyNode extends TempNode {
+export class SkyNode extends TNode {
   static override get type(): string {
     return 'SkyNode'
   }

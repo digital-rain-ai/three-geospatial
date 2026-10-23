@@ -13,7 +13,7 @@ import {
 } from 'three/tsl'
 import {
   NodeUpdateType,
-  TempNode,
+  Node,
   type NodeBuilder,
   type NodeFrame,
   type TextureNode
@@ -24,7 +24,7 @@ import { FnLayout } from './FnLayout'
 
 const sizeScratch = /*#__PURE__*/ new Vector2()
 
-export class LensHaloNode extends TempNode {
+export class LensHaloNode extends Node {
   static override get type(): string {
     return 'LensHaloNode'
   }

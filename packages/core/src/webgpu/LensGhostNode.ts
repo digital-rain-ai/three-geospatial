@@ -1,10 +1,10 @@
 import { add, sub, uniform, uv, vec3 } from 'three/tsl'
-import { TempNode, type NodeBuilder, type TextureNode } from 'three/webgpu'
+import { Node, type NodeBuilder, type TextureNode } from 'three/webgpu'
 import invariant from 'tiny-invariant'
 
 import { FnLayout } from './FnLayout'
 
-export class LensGhostNode extends TempNode {
+export class LensGhostNode extends Node {
   static override get type(): string {
     return 'LensGhostNode'
   }

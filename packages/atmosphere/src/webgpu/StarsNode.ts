@@ -10,7 +10,7 @@ import {
   NodeUpdateType,
   RendererUtils,
   RenderTarget,
-  TempNode,
+  Node,
   type NodeBuilder,
   type NodeFrame,
   type TextureNode,
@@ -37,7 +37,7 @@ function createRenderTarget(): RenderTarget {
 
 const sizeScratch = /*#__PURE__*/ new Vector2()
 
-export class StarsNode extends TempNode {
+export class StarsNode extends Node {
   static override get type(): string {
     return 'StarsNode'
   }

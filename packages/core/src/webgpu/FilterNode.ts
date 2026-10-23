@@ -6,7 +6,7 @@ import {
 } from 'three'
 import {
   NodeUpdateType,
-  TempNode,
+  Node as TNode,
   type NodeBuilder,
   type TextureNode
 } from 'three/webgpu'
@@ -17,7 +17,7 @@ import { outputTexture } from './OutputTextureNode'
 
 // Represents a node that applies a shader on the input texture and outputs
 // another texture of the same dimensions regardless of the drawing buffer size.
-export abstract class FilterNode extends TempNode {
+export abstract class FilterNode extends TNode {
   static override get type(): string {
     return 'FilterNode'
   }

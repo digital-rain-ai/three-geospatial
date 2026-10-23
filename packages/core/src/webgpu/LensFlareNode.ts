@@ -11,7 +11,7 @@ import {
   vec4,
   viewportSize
 } from 'three/tsl'
-import { TempNode, type NodeBuilder, type TextureNode } from 'three/webgpu'
+import { Node as TNode, type NodeBuilder, type TextureNode } from 'three/webgpu'
 import invariant from 'tiny-invariant'
 
 import { DownsampleThresholdNode } from './DownsampleThresholdNode'
@@ -28,7 +28,7 @@ import {
 } from './RenderTargetNode'
 import { isWebGPU } from './utils'
 
-export class LensFlareNode extends TempNode {
+export class LensFlareNode extends TNode {
   static override get type(): string {
     return 'LensFlareNode'
   }

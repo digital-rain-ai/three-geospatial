@@ -49,7 +49,7 @@ import {
 import {
   NodeUpdateType,
   StorageTexture,
-  TempNode,
+  Node as TNode,
   type ComputeNode,
   type NodeBuilder,
   type NodeFrame,
@@ -86,7 +86,7 @@ const vector4Scratch = /*#__PURE__*/ new Vector4()
 const sizeScratch = /*#__PURE__*/ new Vector2()
 const matrixScratch = /*#__PURE__*/ new Matrix4()
 
-export class ScreenSpaceShadowNode extends TempNode {
+export class ScreenSpaceShadowNode extends TNode {
   override get type(): string {
     return 'ScreenSpaceShadowNode'
   }

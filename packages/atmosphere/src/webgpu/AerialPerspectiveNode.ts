@@ -14,7 +14,7 @@ import {
   viewportSharedTexture,
   viewportUV
 } from 'three/tsl'
-import { TempNode, type NodeBuilder, type TextureNode } from 'three/webgpu'
+import { Node as TNode, type NodeBuilder, type TextureNode } from 'three/webgpu'
 
 import {
   depthToViewZ,
@@ -35,7 +35,7 @@ const BACKDROP = 'BACKDROP'
 
 type AerialPerspectiveNodeScope = typeof CAMERA | typeof BACKDROP
 
-export class AerialPerspectiveNode extends TempNode {
+export class AerialPerspectiveNode extends TNode {
   static override get type(): string {
     return 'AerialPerspectiveNode'
   }

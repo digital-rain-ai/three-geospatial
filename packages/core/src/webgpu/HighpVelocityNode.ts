@@ -10,14 +10,14 @@ import {
 } from 'three/tsl'
 import {
   NodeUpdateType,
-  TempNode,
+  Node as TNode,
   type NodeBuilder,
   type NodeFrame
 } from 'three/webgpu'
 
 import type { Node } from './node'
 
-export class HighpVelocityNode extends TempNode {
+export class HighpVelocityNode extends TNode {
   static override get type(): string {
     return 'HighpVelocityNode'
   }

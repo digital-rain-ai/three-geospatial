@@ -10,7 +10,7 @@ import { Fn, pmremTexture, positionGeometry, uniform, vec4 } from 'three/tsl'
 import {
   NodeMaterial,
   NodeUpdateType,
-  TempNode,
+  Node,
   type NodeBuilder,
   type NodeFrame,
   type PMREMNode
@@ -24,7 +24,7 @@ import { sky, type SkyNode } from './SkyNode'
 
 const vectorScratch = /*#__PURE__*/ new Vector3()
 
-export class SkyEnvironmentNode extends TempNode {
+export class SkyEnvironmentNode extends Node {
   static override get type(): string {
     return 'SkyEnvironmentNode'
   }

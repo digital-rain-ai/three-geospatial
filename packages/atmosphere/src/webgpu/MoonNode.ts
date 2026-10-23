@@ -16,7 +16,7 @@ import {
   vec4
 } from 'three/tsl'
 import {
-  TempNode,
+  Node as TNode,
   type NodeBuilder,
   type SampleNode,
   type TextureNode
@@ -96,7 +96,7 @@ const orenNayarDiffuse = /*#__PURE__*/ FnLayout({
   return cosLight.max(0).mul(s.div(t).mul(B).add(A))
 })
 
-export class MoonNode extends TempNode {
+export class MoonNode extends TNode {
   static override get type(): string {
     return 'MoonNode'
   }

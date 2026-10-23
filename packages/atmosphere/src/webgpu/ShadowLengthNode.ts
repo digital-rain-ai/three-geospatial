@@ -40,7 +40,7 @@ import {
 import {
   NodeMaterial,
   NodeUpdateType,
-  TempNode,
+  Node as TNode,
   type NodeBuilder,
   type NodeFrame,
   type SampleNode,
@@ -68,7 +68,7 @@ const vector4Scratch = /*#__PURE__*/ new Vector4()
 const matrixScratch = /*#__PURE__*/ new Matrix4()
 const sizeScratch = /*#__PURE__*/ new Vector2()
 
-export class ShadowLengthNode extends TempNode {
+export class ShadowLengthNode extends TNode {
   static override get type(): string {
     return 'ShadowLengthNode'
   }

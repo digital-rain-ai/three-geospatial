@@ -1,12 +1,12 @@
 import { Fn, fwidth, If, smoothstep, uniform, vec4 } from 'three/tsl'
-import { TempNode, type NodeBuilder } from 'three/webgpu'
+import { Node as TNode, type NodeBuilder } from 'three/webgpu'
 
 import type { Node } from '@takram/three-geospatial/webgpu'
 
 import { getAtmosphereContext } from './AtmosphereContext'
 import { getSolarLuminance } from './runtime'
 
-export class SunNode extends TempNode {
+export class SunNode extends TNode {
   static override get type(): string {
     return 'SunNode'
   }
