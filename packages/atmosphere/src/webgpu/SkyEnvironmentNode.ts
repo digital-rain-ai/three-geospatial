@@ -47,12 +47,12 @@ export class SkyEnvironmentNode extends Node {
 
   private removeLUTUpdate?: () => void
 
-  constructor(size = 64) {
+  constructor(size = 64, starsUrl?: string) {
     super('vec3')
     this.updateBeforeType = NodeUpdateType.FRAME
     this.material.name = 'SkyEnvironment'
 
-    this.skyNode = sky()
+    this.skyNode = sky(null, starsUrl)
     this.skyNode.showSun = false
     this.skyNode.showMoon = false
     this.skyNode.showStars = false

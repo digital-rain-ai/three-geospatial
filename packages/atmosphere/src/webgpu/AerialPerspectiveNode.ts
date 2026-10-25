@@ -61,7 +61,8 @@ export class AerialPerspectiveNode extends TNode {
     scope: AerialPerspectiveNodeScope,
     colorNode: Node<'vec4'>,
     depthNode: TextureNode,
-    shadowLengthNode: Node<'vec2'> | null = null
+    shadowLengthNode: Node<'vec2'> | null = null,
+    starsUrl?: string
   ) {
     super('vec4')
     this.scope = scope
@@ -303,7 +304,8 @@ export class AerialPerspectiveNode extends TNode {
 export const aerialPerspective = (
   colorNode: Node<'vec4'>,
   depthNode: TextureNode,
-  shadowLengthNode?: Node<'vec2'> | null
+  shadowLengthNode?: Node<'vec2'> | null,
+  starsUrl?: string
 ): AerialPerspectiveNode => {
   const node = new AerialPerspectiveNode(
     CAMERA,
@@ -311,7 +313,7 @@ export const aerialPerspective = (
     depthNode,
     shadowLengthNode
   )
-  node.skyNode = sky(shadowLengthNode)
+  node.skyNode = sky(shadowLengthNode, starsUrl)
   return node
 }
 

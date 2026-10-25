@@ -54,14 +54,15 @@ export class SkyNode extends TNode {
 
   constructor(
     scope: SkyNodeScope,
-    shadowLengthNode: Node<'vec2'> | null = null
+    shadowLengthNode: Node<'vec2'> | null = null,
+    starsUrl?: string
   ) {
     super('vec3')
     this.scope = scope
     this.shadowLengthNode = shadowLengthNode
     this.sunNode = new SunNode()
     this.moonNode = new MoonNode()
-    this.starsNode = new StarsNode()
+    this.starsNode = new StarsNode(starsUrl)
   }
 
   override customCacheKey(): number {
